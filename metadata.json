@@ -1,0 +1,8 @@
+{
+    "name": "better sound speak of Super Chinese with Custom made",
+    "description": "A motion-controlled educational game for kids using AI pose tracking.",
+    "requestFramePermissions": [
+        "camera",
+        "microphone"
+    ]
+}
