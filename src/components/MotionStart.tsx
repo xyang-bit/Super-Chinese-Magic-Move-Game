@@ -61,7 +61,7 @@ const MotionStart: React.FC<MotionStartProps> = ({ onStart, numPlayers }) => {
 
             if (nose && nose.visibility > 0.5) {
                 const headX = 1 - nose.x;
-                const headY = nose.y - 0.12; // Forehead offset
+                const headY = nose.y - 0.10; // Forehead offset
 
                 const dx = headX - buttonX;
                 const dy = headY - buttonY;
@@ -147,7 +147,7 @@ const MotionStart: React.FC<MotionStartProps> = ({ onStart, numPlayers }) => {
                 if (!nose || nose.visibility <= 0.5) return null;
 
                 const isP1 = idx === 0;
-                const yPos = nose.y * 100 - 12;
+                const yPos = nose.y * 100 - 10;
                 const xPos = (1 - nose.x) * 100;
                 const mushroomFilter = isP1 ? "" : "hue-rotate(90deg)";
 

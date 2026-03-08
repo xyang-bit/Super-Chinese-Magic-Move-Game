@@ -17,22 +17,26 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* 1. Reset the body to ensure it takes up the whole screen */
-body {
-  margin: 0;
-  display: block; /* Change from flex to block to let content flow naturally */
-  width: 100vw;
-  min-height: 100vh;
-  background-color: #f0fdf4; /* Matches your screenshot */
-}
-
-/* 2. Make the React root container expand */
+/* 1. Ensure the root container fills the entire browser width */
 #root {
   width: 100%;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  align-items: center; /* This will center your game board in the middle of the screen */
+  align-items: center;
+  /* This centers the content horizontally */
+  background-color: #f0fdf4;
+  /* Your light cream/green background */
+}
+
+/* 2. Reset the body to prevent the 'half-page' squish */
+body {
+  margin: 0;
+  padding: 0;
+  display: block;
+  /* Changing this from 'flex' lets #root handle the layout */
+  width: 100vw;
+  overflow-x: hidden;
 }
 
 h1 {
@@ -51,9 +55,11 @@ button {
   cursor: pointer;
   transition: border-color 0.25s;
 }
+
 button:hover {
   border-color: #646cff;
 }
+
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
@@ -64,6 +70,7 @@ button:focus-visible {
     color: #213547;
     background-color: #ffffff;
   }
+
   button {
     background-color: #f9f9f9;
   }

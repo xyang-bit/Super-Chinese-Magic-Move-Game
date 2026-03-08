@@ -71,6 +71,11 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
     const [wrongSelectionId, setWrongSelectionId] = useState<string | null>(null);
     const [explosions, setExplosions] = useState<Explosion[]>([]);
 
+    // --- Dynamic Camera State ---
+    const [camera, setCamera] = useState({ x: 0, y: 0, scale: 1 });
+    const targetCamera = useRef({ x: 0, y: 0, scale: 1 });
+    const requestRef = useRef<number | null>(null);
+
     const currentTarget = useMemo(() => unit.words[currentWordIndex], [unit, currentWordIndex]);
 
     // Sort landmarks spatially (Left-to-Right on screen) to ensure P1 is always Left and P2 is Right
@@ -125,6 +130,77 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
         setupCamera();
     }, []);
 
+    // --- Dynamic Camera Logic ---
+    // 1. Calculate Bounding Box and Target Camera State
+    useEffect(() => {
+        if (sortedLandmarks.length === 0) {
+            targetCamera.current = { x: 0, y: 0, scale: 1 };
+            return;
+        }
+
+        // Get bounds of all active players' noses
+        let minX = 1, maxX = 0, minY = 1, maxY = 0;
+        let count = 0;
+
+        sortedLandmarks.slice(0, numPlayers).forEach(landmarks => {
+            const nose = landmarks[0];
+            if (nose && nose.visibility > 0.5) {
+                const headX = 1 - nose.x; // Mirrored
+                const headY = nose.y;
+                minX = Math.min(minX, headX);
+                maxX = Math.max(maxX, headX);
+                minY = Math.min(minY, headY);
+                maxY = Math.max(maxY, headY);
+                count++;
+            }
+        });
+
+        if (count === 0) {
+            targetCamera.current = { x: 0, y: 0, scale: 1 };
+            return;
+        }
+
+        // Calculate center and spread
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const dx = maxX - minX;
+        const dy = maxY - minY;
+
+        // Determine zoom level based on spread (how far apart players are)
+        // Base scale is 1.2 to 1.8. Closer players = higher scale.
+        // We want some margin around players.
+        const margin = 0.4;
+        const spread = Math.max(dx, dy, 0.2); // Don't zoom in TOO much on one person
+        let newScale = 1 / (spread + margin);
+        newScale = Math.min(Math.max(newScale, 1), 2.2); // Clamp between 1.0x and 2.2x
+
+        // Panning: Offset is how far to move the "world" to keep centerX at screen center (0.5)
+        // translate = (0.5 - centerX) * scale * 100%
+        const targetX = (0.5 - centerX) * 100 * newScale;
+        const targetY = (0.4 - centerY) * 100 * newScale; // Keep players slightly above center
+
+        targetCamera.current = { x: targetX, y: targetY, scale: newScale };
+    }, [sortedLandmarks, numPlayers]);
+
+    // 2. Smooth Interpolation (Lerp) Loop
+    useEffect(() => {
+        const lerp = (start: number, end: number, factor: number) => start + (end - start) * factor;
+
+        const animate = () => {
+            setCamera(prev => ({
+                x: lerp(prev.x, targetCamera.current.x, 0.1),
+                y: lerp(prev.y, targetCamera.current.y, 0.1),
+                scale: lerp(prev.scale, targetCamera.current.scale, 0.1),
+            }));
+            requestRef.current = requestAnimationFrame(animate);
+        };
+
+        requestRef.current = requestAnimationFrame(animate);
+        return () => {
+            if (requestRef.current) cancelAnimationFrame(requestRef.current);
+        };
+    }, []);
+
     // Collision Loop
     useEffect(() => {
         if (gameState !== 'playing' || sortedLandmarks.length === 0) return;
@@ -140,8 +216,8 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
 
             if (nose && nose.visibility > 0.5) {
                 const headX = 1 - nose.x; // Mirroring
-                // Collision point is the Mushroom (Forehead), which is visually offset by 12% height above nose
-                const headY = nose.y - 0.12;
+                // Collision point is the Mushroom (Forehead), which is visually offset by 10% height above nose
+                const headY = nose.y - 0.10;
 
                 // Define box centers
                 options.forEach((opt, boxIdx) => {
@@ -245,7 +321,7 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
 
     // Determine what text to show on screen for prompt
     const promptText = gameState === 'playing'
-        ? (gameMode === 'translation' ? `Find: ${currentTarget.english}` : `目标: ${currentTarget.word}`)
+        ? (gameMode === 'translation' ? `Find: ${currentTarget.english}` : `Target: ${currentTarget.english}`)
         : feedbackMessage;
 
     return (
@@ -314,26 +390,140 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
 
             {/* Game Area */}
             <div className="relative flex-1 w-full h-full overflow-hidden bg-gray-900">
-                <video
-                    ref={videoRef}
-                    className="absolute w-full h-full object-cover transform -scale-x-100"
-                    playsInline
-                    muted
-                />
 
-                {/* MARIO-INSPIRED CURTAIN & BACKDROP */}
+                {/* TRANSFORM CONTAINER (The World) */}
+                <div
+                    className="absolute inset-0 w-full h-full transition-transform duration-0"
+                    style={{
+                        transform: `scale(${camera.scale}) translate(${camera.x / camera.scale}%, ${camera.y / camera.scale}%)`,
+                        transformOrigin: 'center center'
+                    }}
+                >
+                    <video
+                        ref={videoRef}
+                        className="absolute w-full h-full object-cover transform -scale-x-100"
+                        playsInline
+                        muted
+                    />
+
+                    {/* Render Boxes (Inside Transformed World) */}
+                    {!isLoading && (
+                        <>
+                            {Array.from({ length: numPlayers }).map((_, pIndex) => (
+                                <div key={`p-zone-${pIndex}`} className="contents">
+                                    {options.map((opt, boxIdx) => {
+                                        let leftPct = '50%';
+                                        if (numPlayers === 1) {
+                                            if (boxIdx === 0) leftPct = '20%';
+                                            if (boxIdx === 1) leftPct = '50%';
+                                            if (boxIdx === 2) leftPct = '80%';
+                                        } else {
+                                            const zoneWidth = 50;
+                                            const offset = pIndex === 0 ? 0 : 50;
+                                            const relPos = (boxIdx * 2 + 1) / 6;
+                                            leftPct = `${offset + (relPos * zoneWidth)}%`;
+                                        }
+
+                                        let extraClasses = "";
+                                        let opacity = "opacity-100";
+                                        if (gameState === 'feedback_correct' && opt.id === currentTarget.id) {
+                                            if (winner === pIndex || winner === null) {
+                                                extraClasses = "animate-celebrate bg-yellow-200 border-yellow-500 ring-8 ring-yellow-300 z-50 scale-125";
+                                            } else {
+                                                opacity = "opacity-50 grayscale";
+                                            }
+                                        } else if (gameState === 'feedback_wrong') {
+                                            if (opt.id === wrongSelectionId) {
+                                                extraClasses = "animate-shake bg-red-200 border-red-500 ring-4 ring-red-400 z-50";
+                                            } else {
+                                                opacity = "opacity-40 scale-90";
+                                            }
+                                        } else if (gameState === 'feedback_correct' && opt.id !== currentTarget.id) {
+                                            opacity = "opacity-20 scale-75";
+                                        }
+
+                                        const sizeClasses = numPlayers === 1 ? "w-32 h-32 md:w-48 md:h-48" : "w-24 h-24 md:w-32 md:h-32";
+
+                                        return (
+                                            <div
+                                                key={`p${pIndex}-opt${opt.id}`}
+                                                className={`absolute top-[30%] -translate-x-1/2 -translate-y-1/2 
+                                                    ${sizeClasses}
+                                                    bg-white/95 rounded-3xl shadow-2xl border-b-8 border-gray-200
+                                                    flex flex-col items-center justify-center
+                                                    transition-all duration-300 ease-out
+                                                    ${gameState === 'playing' ? 'hover:scale-105' : ''}
+                                                    ${extraClasses} ${opacity}
+                                                `}
+                                                style={{ left: leftPct }}
+                                            >
+                                                <span className={`${numPlayers === 1 ? 'text-4xl md:text-6xl' : 'text-3xl md:text-5xl'} font-black text-gray-800 tracking-tight text-center leading-none`}>
+                                                    {opt.word}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ))}
+                        </>
+                    )}
+
+                    {/* Firework Explosions (Inside Transformed World) */}
+                    {explosions.map(exp => (
+                        <FireworkBurst key={exp.id} x={exp.x} y={exp.y} />
+                    ))}
+
+                    {/* Avatars (Inside Transformed World) */}
+                    {sortedLandmarks.map((poses, idx) => {
+                        if (idx >= numPlayers) return null;
+                        const nose = poses[0];
+                        if (!nose || nose.visibility <= 0.5) return null;
+                        const isP1 = idx === 0;
+                        const yPos = nose.y * 100 - 10;
+                        const xPos = (1 - nose.x) * 100;
+                        const labelColor = isP1 ? "bg-red-500" : "bg-green-500";
+                        const mushroomFilter = isP1 ? "" : "hue-rotate(90deg)";
+                        return (
+                            <div
+                                key={idx}
+                                className={`game-cursor absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 z-50 transition-none`}
+                                style={{ left: `${xPos}%`, top: `${yPos}%` }}
+                            >
+                                <div className="relative">
+                                    <span
+                                        className="text-[6rem] block filter drop-shadow-lg"
+                                        style={{ filter: `${mushroomFilter} drop-shadow(0 4px 6px rgba(0,0,0,0.5))` }}
+                                    >
+                                        🍄
+                                    </span>
+                                </div>
+                                <span className={`${labelColor} text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-md -mt-4 z-10`}>
+                                    P{idx + 1}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* MARIO-INSPIRED BACKDROP (With Parallax Offset) */}
                 <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-[#6b8cff]/60">
-                    {/* 1. Sky Gradient Overlay (Classic Mario Blue, semi-transparent) */}
                     <div className="absolute inset-0 bg-gradient-to-b from-[#6b8cff]/60 to-transparent mix-blend-multiply"></div>
 
-                    {/* 2. Floating Clouds (Decorative, semi-transparent) */}
-                    <div className="absolute top-20 left-[10%] opacity-40 text-white text-9xl animate-pulse">☁️</div>
-                    <div className="absolute top-40 right-[15%] opacity-30 text-white text-8xl animate-pulse delay-700">☁️</div>
-                    <div className="absolute top-10 left-[40%] opacity-20 text-white text-7xl">☁️</div>
+                    {/* Parallax Clouds (Smarter translation: camera.x * smallFactor) */}
+                    <div
+                        className="absolute inset-0 w-[120%] h-full flex"
+                        style={{ transform: `translateX(${camera.x * 0.2}%)` }}
+                    >
+                        <div className="absolute top-20 left-[10%] opacity-40 text-white text-9xl animate-pulse">☁️</div>
+                        <div className="absolute top-40 left-[65%] opacity-30 text-white text-8xl animate-pulse delay-700">☁️</div>
+                        <div className="absolute top-10 left-[40%] opacity-20 text-white text-7xl">☁️</div>
+                    </div>
 
-                    {/* 3. Hills / Ground Decoration (Bottom Layer) */}
-                    <div className="absolute bottom-0 w-full h-32 flex items-end opacity-70">
-                        {/* CSS Shapes for Hills */}
+                    {/* Parallax Hills (Faster than clouds, slower than world) */}
+                    <div
+                        className="absolute bottom-0 w-[150%] h-32 flex items-end opacity-70"
+                        style={{ transform: `translateX(${camera.x * 0.5}%)` }}
+                    >
                         <div className="w-1/3 h-20 bg-green-500 rounded-t-[4rem] mx-[-40px] border-4 border-green-700/40"></div>
                         <div className="w-1/2 h-32 bg-green-400 rounded-t-[6rem] z-10 mx-[-20px] border-4 border-green-600/40"></div>
                         <div className="w-1/4 h-16 bg-green-600 rounded-t-[3rem] mx-[-10px] border-4 border-green-800/40"></div>
@@ -341,121 +531,11 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
                     </div>
                 </div>
 
-                {/* Split Screen Divider - SOLID & BRIGHT (Yellow for Coin/Block feel) */}
+                {/* Split Screen Divider */}
                 {numPlayers === 2 && (
                     <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 z-10 w-2 bg-yellow-300 shadow-[0_0_25px_rgba(253,224,71,0.9)] h-full"></div>
                 )}
 
-                {/* Render Boxes */}
-                {!isLoading && (
-                    <>
-                        {Array.from({ length: numPlayers }).map((_, pIndex) => (
-                            <div key={`p-zone-${pIndex}`} className="contents">
-                                {options.map((opt, boxIdx) => {
-                                    // Calculate CSS Left position
-                                    let leftPct = '50%';
-
-                                    if (numPlayers === 1) {
-                                        if (boxIdx === 0) leftPct = '20%';
-                                        if (boxIdx === 1) leftPct = '50%';
-                                        if (boxIdx === 2) leftPct = '80%';
-                                    } else {
-                                        const zoneWidth = 50; // percent
-                                        const offset = pIndex === 0 ? 0 : 50;
-                                        const relPos = (boxIdx * 2 + 1) / 6; // 1/6, 3/6, 5/6
-                                        leftPct = `${offset + (relPos * zoneWidth)}%`;
-                                    }
-
-                                    // Visual Styling based on Feedback
-                                    let extraClasses = "";
-                                    let opacity = "opacity-100";
-
-                                    if (gameState === 'feedback_correct' && opt.id === currentTarget.id) {
-                                        // CELEBRATE!
-                                        if (winner === pIndex || winner === null) {
-                                            extraClasses = "animate-celebrate bg-yellow-200 border-yellow-500 ring-8 ring-yellow-300 z-50 scale-125";
-                                        } else {
-                                            opacity = "opacity-50 grayscale";
-                                        }
-                                    } else if (gameState === 'feedback_wrong') {
-                                        if (opt.id === wrongSelectionId) {
-                                            // SHAKE IT OFF
-                                            extraClasses = "animate-shake bg-red-200 border-red-500 ring-4 ring-red-400 z-50";
-                                        } else {
-                                            opacity = "opacity-40 scale-90";
-                                        }
-                                    } else if (gameState === 'feedback_correct' && opt.id !== currentTarget.id) {
-                                        opacity = "opacity-20 scale-75";
-                                    }
-
-                                    const sizeClasses = numPlayers === 1
-                                        ? "w-32 h-32 md:w-48 md:h-48"
-                                        : "w-24 h-24 md:w-32 md:h-32";
-
-                                    return (
-                                        <div
-                                            key={`p${pIndex}-opt${opt.id}`}
-                                            className={`absolute top-[30%] -translate-x-1/2 -translate-y-1/2 
-                                                ${sizeClasses}
-                                                bg-white/95 rounded-3xl shadow-2xl border-b-8 border-gray-200
-                                                flex flex-col items-center justify-center
-                                                transition-all duration-300 ease-out
-                                                ${gameState === 'playing' ? 'hover:scale-105' : ''}
-                                                ${extraClasses} ${opacity}
-                                    `}
-                                            style={{ left: leftPct }}
-                                        >
-                                            {/* Show Chinese Word */}
-                                            <span className={`${numPlayers === 1 ? 'text-4xl md:text-6xl' : 'text-3xl md:text-5xl'} font-black text-gray-800 tracking-tight text-center leading-none`}>
-                                                {opt.word}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ))}
-                    </>
-                )}
-
-                {/* Firework Explosions */}
-                {explosions.map(exp => (
-                    <FireworkBurst key={exp.id} x={exp.x} y={exp.y} />
-                ))}
-
-                {/* Avatars */}
-                {sortedLandmarks.map((poses, idx) => {
-                    if (idx >= numPlayers) return null;
-                    const nose = poses[0];
-                    if (!nose || nose.visibility <= 0.5) return null;
-
-                    const isP1 = idx === 0;
-                    const yPos = nose.y * 100 - 12;
-                    const xPos = (1 - nose.x) * 100;
-
-                    const labelColor = isP1 ? "bg-red-500" : "bg-green-500";
-                    const mushroomFilter = isP1 ? "" : "hue-rotate(90deg)";
-
-                    return (
-                        <div
-                            key={idx}
-                            className={`game-cursor absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2 z-50 transition-none`}
-                            style={{ left: `${xPos}%`, top: `${yPos}%` }}
-                        >
-                            <div className="relative">
-                                <span
-                                    className="text-[6rem] block filter drop-shadow-lg"
-                                    style={{ filter: `${mushroomFilter} drop-shadow(0 4px 6px rgba(0,0,0,0.5))` }}
-                                >
-                                    🍄
-                                </span>
-                            </div>
-
-                            <span className={`${labelColor} text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-md -mt-4 z-10`}>
-                                P{idx + 1}
-                            </span>
-                        </div>
-                    );
-                })}
             </div>
         </div>
     );

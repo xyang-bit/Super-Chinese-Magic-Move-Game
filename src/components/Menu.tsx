@@ -27,10 +27,7 @@ const Menu: React.FC<MenuProps> = ({
     const [editingUnit, setEditingUnit] = useState<GameUnit | null>(null);
     const [isCreating, setIsCreating] = useState(false);
 
-    const handleEditClick = (unit: GameUnit, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setEditingUnit(unit);
-    };
+
 
     const handleSave = (unit: GameUnit) => {
         onUpdateUnit(unit);
@@ -75,8 +72,8 @@ const Menu: React.FC<MenuProps> = ({
                             <button
                                 onClick={() => setNumPlayers(1)}
                                 className={`px-6 py-2 rounded-full font-bold text-lg transition-all ${numPlayers === 1
-                                        ? 'bg-red-500 text-white shadow-sm'
-                                        : 'text-gray-500 hover:bg-gray-100'
+                                    ? 'bg-red-500 text-white shadow-sm'
+                                    : 'text-gray-500 hover:bg-gray-100'
                                     }`}
                             >
                                 👤 1 Player
@@ -84,8 +81,8 @@ const Menu: React.FC<MenuProps> = ({
                             <button
                                 onClick={() => setNumPlayers(2)}
                                 className={`px-6 py-2 rounded-full font-bold text-lg transition-all ${numPlayers === 2
-                                        ? 'bg-purple-500 text-white shadow-sm'
-                                        : 'text-gray-500 hover:bg-gray-100'
+                                    ? 'bg-purple-500 text-white shadow-sm'
+                                    : 'text-gray-500 hover:bg-gray-100'
                                     }`}
                             >
                                 👥 2 Players
@@ -97,17 +94,17 @@ const Menu: React.FC<MenuProps> = ({
                             <button
                                 onClick={() => setGameMode('classic')}
                                 className={`px-6 py-2 rounded-full font-bold text-lg transition-all ${gameMode === 'classic'
-                                        ? 'bg-orange-500 text-white shadow-sm'
-                                        : 'text-gray-500 hover:bg-gray-100'
+                                    ? 'bg-orange-500 text-white shadow-sm'
+                                    : 'text-gray-500 hover:bg-gray-100'
                                     }`}
                             >
-                                🔊 Listen (ZH)
+                                🔊 Listen (ZH) & Read (EN)
                             </button>
                             <button
                                 onClick={() => setGameMode('translation')}
                                 className={`px-6 py-2 rounded-full font-bold text-lg transition-all ${gameMode === 'translation'
-                                        ? 'bg-blue-500 text-white shadow-sm'
-                                        : 'text-gray-500 hover:bg-gray-100'
+                                    ? 'bg-blue-500 text-white shadow-sm'
+                                    : 'text-gray-500 hover:bg-gray-100'
                                     }`}
                             >
                                 🔤 EN ➡️ ZH

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { GameUnit, WordItem } from '../types';
-import { speak } from '../services/soundService';
+
 
 interface UnitEditorProps {
     unit?: GameUnit;
@@ -216,7 +216,7 @@ const UnitEditor: React.FC<UnitEditorProps> = ({ unit, onSave, onCancel, onDelet
                                                 <button
                                                     key={e}
                                                     onClick={() => setIcon(e)}
-                                                    className={`text-2xl w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100 flex-shrink-0 transition-all ${icon === e ? 'bg-blue-100 ring-2 ring-blue-400' : ''}`}
+                                                    className={`text - 2xl w - 10 h - 10 flex items - center justify - center rounded - lg hover: bg - gray - 100 flex - shrink - 0 transition - all ${icon === e ? 'bg-blue-100 ring-2 ring-blue-400' : ''} `}
                                                 >
                                                     {e}
                                                 </button>
@@ -235,11 +235,11 @@ const UnitEditor: React.FC<UnitEditorProps> = ({ unit, onSave, onCancel, onDelet
                                     <button
                                         key={c}
                                         onClick={() => setColor(c)}
-                                        className={`w-8 h-8 rounded-full ${c} ${color === c ? 'ring-4 ring-offset-2 ring-gray-300 scale-110 shadow-md' : 'hover:scale-110 hover:shadow'} transition-all`}
+                                        className={`w - 8 h - 8 rounded - full ${c} ${color === c ? 'ring-4 ring-offset-2 ring-gray-300 scale-110 shadow-md' : 'hover:scale-110 hover:shadow'} transition - all`}
                                     />
                                 ))}
                             </div>
-                            <div className={`w-full h-24 rounded-2xl ${color} flex items-center justify-center text-white shadow-lg transform transition-all`}>
+                            <div className={`w - full h - 24 rounded - 2xl ${color} flex items - center justify - center text - white shadow - lg transform transition - all`}>
                                 <div className="text-center">
                                     <span className="text-4xl block mb-1 drop-shadow-sm">{icon}</span>
                                     <span className="font-bold text-lg drop-shadow-sm px-4 truncate max-w-[200px] block">{title || 'Unit Title'}</span>
@@ -260,13 +260,13 @@ const UnitEditor: React.FC<UnitEditorProps> = ({ unit, onSave, onCancel, onDelet
                             <div className="flex bg-gray-100 p-1 rounded-lg">
                                 <button
                                     onClick={() => setIsBulkMode(false)}
-                                    className={`px-3 py-1 text-sm font-semibold rounded-md transition-all ${!isBulkMode ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
+                                    className={`px - 3 py - 1 text - sm font - semibold rounded - md transition - all ${!isBulkMode ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'} `}
                                 >
                                     Single Add
                                 </button>
                                 <button
                                     onClick={() => setIsBulkMode(true)}
-                                    className={`px-3 py-1 text-sm font-semibold rounded-md transition-all ${isBulkMode ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'}`}
+                                    className={`px - 3 py - 1 text - sm font - semibold rounded - md transition - all ${isBulkMode ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'} `}
                                 >
                                     Bulk Import
                                 </button>
