@@ -182,6 +182,8 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
               playsInline 
               muted 
             />
+            {/* Green Backdrop Overlay */}
+            <div className="absolute inset-0 bg-green-500/15 pointer-events-none" />
         </div>
 
         {/* --- LAYER 2: GAME WORLD (STATIC DECOR) --- */}
