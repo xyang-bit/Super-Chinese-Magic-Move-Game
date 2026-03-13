@@ -220,10 +220,15 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
             </div>
         )}
 
-        {/* --- LAYER 1: THE CAMERA (ZOOMING) --- */}
-        <div className="absolute inset-0 z-0 bg-gray-900" style={cameraTransform}>
-            <video ref={videoRef} className="w-full h-full object-cover transform -scale-x-100" playsInline muted />
-            <div className="absolute inset-0 bg-[#6b8cff]/40 mix-blend-multiply" />
+        {/* --- LAYER 1: THE CAMERA --- */}
+        <div className="absolute inset-0 z-0 overflow-hidden bg-black">
+            <video 
+              ref={videoRef} 
+              style={cameraTransform}
+              className="w-full h-full object-cover transform -scale-x-100" 
+              playsInline 
+              muted 
+            />
         </div>
 
         {/* --- LAYER 2: GAME WORLD (STATIC) --- */}
@@ -251,14 +256,14 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
             </div>
 
             {/* Target Boxes */}
-            <div className="absolute top-[20%] left-0 right-0 h-32 z-50 pointer-events-none">
+            <div className="relative h-[30%] w-full">
                 {options.map((opt, boxIdx) => {
                     let leftPos = "50%";
                     if (numPlayers === 1) leftPos = boxIdx === 0 ? "20%" : boxIdx === 1 ? "50%" : "80%";
                     else leftPos = `${(boxIdx < 3 ? (boxIdx * 2 + 1) / 6 * 50 : 50)}%`; // Simplified for example
 
                     return (
-                        <div key={opt.id} className={`absolute -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/95 rounded-3xl shadow-2xl flex items-center justify-center transition-all pointer-events-auto ${gameState === 'feedback_wrong' && opt.id === wrongSelectionId ? 'animate-shake' : ''}`} style={{ left: leftPos, top: '0%' }}>
+                        <div key={opt.id} className={`absolute -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/95 rounded-3xl shadow-2xl flex items-center justify-center transition-all pointer-events-auto ${gameState === 'feedback_wrong' && opt.id === wrongSelectionId ? 'animate-shake' : ''}`} style={{ left: leftPos, top: '50%' }}>
                             <span className="text-4xl font-black">{opt.word}</span>
                         </div>
                     );
