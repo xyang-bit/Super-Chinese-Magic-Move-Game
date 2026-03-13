@@ -167,10 +167,10 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
   const promptText = gameState === 'playing' ? (gameMode === 'translation' ? `Find: ${currentTarget.english}` : `Target: ${currentTarget.english}`) : feedbackMessage;
 
   return (
-    <div className="fixed inset-0 bg-black flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black flex flex-col overflow-hidden font-bold">
         {isLoading && (
             <div className="absolute inset-0 z-[100] flex items-center justify-center bg-white">
-                <div className="text-2xl font-bold animate-pulse">正在加载 AI 视觉... 🤖</div>
+                <div className="text-3xl font-black animate-pulse mario-text-shadow text-[#E52521]">正在加载 AI 视觉... 🤖</div>
             </div>
         )}
 
@@ -188,42 +188,69 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
 
         {/* --- LAYER 2: GAME WORLD (STATIC DECOR) --- */}
         <div className="absolute inset-0 z-10 pointer-events-none">
-            <div className="absolute top-20 left-[10%] opacity-40 text-8xl">☁️</div>
+            <div className="absolute top-20 left-[10%] opacity-40 text-8xl scale-125">☁️</div>
             <div className="absolute top-40 right-[15%] opacity-30 text-7xl">☁️</div>
-            <div className="absolute bottom-0 w-full h-32 flex items-end opacity-60">
-                <div className="w-full h-24 bg-green-500 rounded-t-[5rem]" />
+            <div className="absolute bottom-0 w-full h-32 flex items-end opacity-80">
+                <div className="w-full h-24 bg-[#43B047] border-t-8 border-black rounded-t-[5rem]" />
             </div>
         </div>
 
         {/* --- LAYER 3: INTERACTIVE UI --- */}
         <div className="absolute inset-0 z-50 pointer-events-none">
-            {/* Top Bar */}
-            <div className="p-4 flex justify-between items-start">
-                <button onClick={onExit} className="pointer-events-auto bg-white/90 px-8 py-2 rounded-full font-bold shadow-lg border-2 border-gray-200">退出</button>
-                <div className="flex gap-4">
-                    {scores.map((s, i) => (numPlayers > i && <div key={i} className={`${i === 0 ? 'bg-red-100' : 'bg-green-100'} px-6 py-2 rounded-2xl font-bold shadow-md`}>P{i+1}: {s}</div>))}
+            {/* Top Bar (Scoreboard & Exit) */}
+            <div className="p-6 flex justify-between items-start">
+                <button 
+                  onClick={onExit} 
+                  className="pointer-events-auto mario-button px-8 py-3 rounded-xl text-xl shadow-2xl active:scale-95 transition-transform"
+                >
+                  退出 [ESC]
+                </button>
+                <div className="flex gap-6">
+                    {scores.map((s, i) => (
+                      numPlayers > i && (
+                        <div 
+                          key={i} 
+                          className={`mario-block px-6 py-3 rounded-2xl flex items-center gap-3 shadow-xl ${i === 0 ? 'bg-[#ffedef]' : 'bg-[#e7f9e8]'}`}
+                          style={{ borderColor: i === 0 ? '#E52521' : '#43B047' }}
+                        >
+                          <span className="text-2xl">🪙</span>
+                          <span className="text-2xl font-black">P{i+1}: {s}</span>
+                        </div>
+                      )
+                    ))}
                 </div>
             </div>
 
             {/* Prompt */}
-            <div className="text-center mt-12">
-                <h2 className="text-5xl font-bold text-white drop-shadow-lg">{promptText}</h2>
+            <div className="text-center mt-8">
+                <h2 className="text-6xl font-black text-white mario-text-shadow tracking-tighter uppercase italic">{promptText}</h2>
             </div>
 
-            {/* Target Boxes */}
+            {/* Target Boxes (The Mario Blocks) */}
             <div className="relative h-[30%] w-full">
                 {options.map((opt, boxIdx) => {
                     let leftPos = "50%";
                     if (numPlayers === 1) leftPos = boxIdx === 0 ? "20%" : boxIdx === 1 ? "50%" : "80%";
                     else leftPos = `${(boxIdx < 3 ? (boxIdx * 2 + 1) / 6 * 50 : 50)}%`; 
 
+                    const isTarget = opt.id === currentTarget.id;
+
                     return (
                         <div 
                           key={opt.id} 
-                          className={`absolute -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/95 rounded-3xl shadow-2xl flex items-center justify-center transition-all pointer-events-auto ${gameState === 'feedback_wrong' && opt.id === wrongSelectionId ? 'animate-shake' : ''}`} 
-                          style={{ left: leftPos, top: '50%' }}
+                          className={`absolute -translate-x-1/2 -translate-y-1/2 w-36 h-36 mario-block rounded-2xl flex flex-col items-center justify-center transition-all pointer-events-auto 
+                            ${gameState === 'feedback_wrong' && opt.id === wrongSelectionId ? 'animate-shake' : ''}
+                            ${gameState === 'feedback_correct' && isTarget ? 'animate-mario-jump' : ''}
+                          `} 
+                          style={{ left: leftPos, top: '50%', backgroundColor: isTarget ? '#FBD000' : '#E52521', color: 'white' }}
                         >
-                            <span className="text-4xl font-black">{opt.word}</span>
+                            {/* Decorative Rivets */}
+                            <div className="absolute top-2 left-2 w-2 h-2 bg-black/20 rounded-full" />
+                            <div className="absolute top-2 right-2 w-2 h-2 bg-black/20 rounded-full" />
+                            <div className="absolute bottom-2 left-2 w-2 h-2 bg-black/20 rounded-full" />
+                            <div className="absolute bottom-2 right-2 w-2 h-2 bg-black/20 rounded-full" />
+
+                            <span className="text-5xl font-black mario-text-shadow">{opt.word}</span>
                         </div>
                     );
                 })}
@@ -234,8 +261,11 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
                 const nose = poses[0];
                 if (!nose || nose.visibility <= 0.5) return null;
                 return (
-                    <div key={idx} className="absolute transform -translate-x-1/2 -translate-y-1/2" style={{ left: `${(1 - nose.x) * 100}%`, top: `${nose.y * 100}%` }}>
-                        <span className="text-8xl" style={{ filter: idx === 1 ? "hue-rotate(90deg)" : "" }}>🍄</span>
+                    <div key={idx} className="absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-75" style={{ left: `${(1 - nose.x) * 100}%`, top: `${nose.y * 100}%` }}>
+                        <div className="relative">
+                          <span className="text-8xl drop-shadow-2xl filter" style={{ filter: idx === 1 ? "hue-rotate(90deg)" : "" }}>🍄</span>
+                          <div className={`absolute -top-12 left-1/2 -translate-x-1/2 bg-white text-black px-3 py-1 rounded-full text-xs border-2 border-black font-black mario-text-shadow`}>P{idx+1}</div>
+                        </div>
                     </div>
                 );
             })}
