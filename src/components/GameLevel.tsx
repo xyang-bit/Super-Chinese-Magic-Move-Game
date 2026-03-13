@@ -94,12 +94,11 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
     }
   }, [sortedLandmarks, numPlayers]);
 
-  // 2. Adjust the pan intensity
-  // We use a smaller multiplier (15 instead of 30) so the camera doesn't "swing" too far
-  const cameraTransform = {
-    transform: `scale(${cameraSmooth.zoom}) translate(${(0.5 - cameraSmooth.x) * 15}%, ${(0.5 - cameraSmooth.y) * 10}%)`,
-    transition: 'transform 0.2s ease-out' // Added a slight ease for smoothness
-  };
+  // 1. Calculate the smoothed transform
+  const cameraTransform = useMemo(() => ({
+    transform: `scale(${cameraSmooth.zoom}) translate(${(0.5 - cameraSmooth.x) * 20}%, ${(0.5 - cameraSmooth.y) * 15}%)`,
+    transition: 'transform 0.15s ease-out'
+  }), [cameraSmooth]);
 
   // --- END CAMERA LOGIC ---
 
@@ -128,37 +127,50 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
     setupCamera();
   }, []);
 
+  // 2. Collision Loop that accounts for the "Follow-Me" offset
   useEffect(() => {
     if (gameState !== 'playing' || sortedLandmarks.length === 0) return;
-    for (let playerIdx = 0; playerIdx < numPlayers; playerIdx++) {
-        const playerLandmarks = sortedLandmarks[playerIdx];
-        if (!playerLandmarks) continue;
-        const nose = playerLandmarks[0];
-        if (nose && nose.visibility > 0.5) {
-            const headX = 1 - nose.x;
-            const headY = nose.y - 0.10; 
-            options.forEach((opt, boxIdx) => {
-                let boxCX = 0.5;
-                const boxCY = 0.2; // Match 20% visually
-                if (numPlayers === 1) {
-                    if (boxIdx === 0) boxCX = 0.2;
-                    if (boxIdx === 1) boxCX = 0.5;
-                    if (boxIdx === 2) boxCX = 0.8;
-                } else {
-                    const zoneWidth = 0.5;
-                    const offset = playerIdx === 0 ? 0 : 0.5;
-                    boxCX = offset + ((boxIdx * 2 + 1) / 6 * zoneWidth);
-                }
-                const dx = headX - boxCX;
-                const dy = headY - boxCY;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                if (distance < (numPlayers === 1 ? COLLISION_THRESHOLD : COLLISION_THRESHOLD * 0.8)) {
-                   handleSelection(opt, playerIdx, boxCX, boxCY);
-                }
-            });
-        }
-    }
-  }, [sortedLandmarks, gameState, options, numPlayers]);
+
+    sortedLandmarks.slice(0, numPlayers).forEach((playerLandmarks, playerIdx) => {
+      const nose = playerLandmarks[0];
+      if (nose && nose.visibility > 0.5) {
+        
+        // RAW COORDINATES (0 to 1)
+        const rawX = 1 - nose.x; 
+        const rawY = nose.y - 0.10; 
+
+        /* ADJUSTMENT: We calculate where the head is visually on the screen 
+           based on the current camera zoom and pan.
+        */
+        const visualX = 0.5 + (rawX - cameraSmooth.x) * cameraSmooth.zoom;
+        const visualY = 0.5 + (rawY - cameraSmooth.y) * cameraSmooth.zoom;
+
+        options.forEach((opt, boxIdx) => {
+          // Define static Box Centers (Screen Space)
+          let boxCX = 0.5;
+          const boxCY = 0.25; // Keep boxes in the top 25% of the screen
+
+          if (numPlayers === 1) {
+            boxCX = [0.2, 0.5, 0.8][boxIdx];
+          } else {
+            const offset = playerIdx === 0 ? 0 : 0.5;
+            boxCX = offset + ((boxIdx * 2 + 1) / 6 * 0.5);
+          }
+
+          const dx = visualX - boxCX;
+          const dy = visualY - boxCY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          // Slightly larger threshold for better "feel" when zoomed
+          const threshold = COLLISION_THRESHOLD * cameraSmooth.zoom;
+
+          if (distance < threshold) {
+            handleSelection(opt, playerIdx, boxCX, boxCY);
+          }
+        });
+      }
+    });
+  }, [sortedLandmarks, gameState, options, numPlayers, cameraSmooth]);
 
   const handleSelection = (selected: WordItem, playerIdx: number, x: number, y: number) => {
     if (gameState !== 'playing') return;
