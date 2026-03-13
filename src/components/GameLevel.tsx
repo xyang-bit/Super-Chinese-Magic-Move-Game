@@ -81,7 +81,8 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
       let targetZoom = 1.3; // Default zoom in
       if (numPlayers > 1 && sortedLandmarks.length > 1) {
         const dist = Math.abs((1 - sortedLandmarks[0][0].x) - (1 - sortedLandmarks[1][0].x));
-        targetZoom = Math.max(1, 1.4 - dist); // Zoom out as they move apart
+        // 1. More conservative zoom range
+        targetZoom = Math.max(1, 1.25 - (dist * 0.5)); // Capped at 1.25x instead of 1.5x
       }
 
       // Simple Lerp for smoothing
@@ -93,9 +94,11 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
     }
   }, [sortedLandmarks, numPlayers]);
 
+  // 2. Adjust the pan intensity
+  // We use a smaller multiplier (15 instead of 30) so the camera doesn't "swing" too far
   const cameraTransform = {
-    transform: `scale(${cameraSmooth.zoom}) translate(${(0.5 - cameraSmooth.x) * 30}%, ${(0.5 - cameraSmooth.y) * 20}%)`,
-    transition: 'transform 0.1s linear'
+    transform: `scale(${cameraSmooth.zoom}) translate(${(0.5 - cameraSmooth.x) * 15}%, ${(0.5 - cameraSmooth.y) * 10}%)`,
+    transition: 'transform 0.2s ease-out' // Added a slight ease for smoothness
   };
 
   // --- END CAMERA LOGIC ---
