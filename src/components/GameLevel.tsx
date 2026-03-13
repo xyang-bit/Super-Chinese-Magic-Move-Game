@@ -139,7 +139,7 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
             const headY = nose.y - 0.10; 
             options.forEach((opt, boxIdx) => {
                 let boxCX = 0.5;
-                const boxCY = 0.3;
+                const boxCY = 0.2; // Match 20% visually
                 if (numPlayers === 1) {
                     if (boxIdx === 0) boxCX = 0.2;
                     if (boxIdx === 1) boxCX = 0.5;
@@ -239,14 +239,14 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
             </div>
 
             {/* Target Boxes */}
-            <div className="relative h-full w-full">
+            <div className="absolute top-[20%] left-0 right-0 h-32 z-50 pointer-events-none">
                 {options.map((opt, boxIdx) => {
                     let leftPos = "50%";
                     if (numPlayers === 1) leftPos = boxIdx === 0 ? "20%" : boxIdx === 1 ? "50%" : "80%";
                     else leftPos = `${(boxIdx < 3 ? (boxIdx * 2 + 1) / 6 * 50 : 50)}%`; // Simplified for example
 
                     return (
-                        <div key={opt.id} className={`absolute top-[35%] -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/95 rounded-3xl shadow-2xl flex items-center justify-center transition-all ${gameState === 'feedback_wrong' && opt.id === wrongSelectionId ? 'animate-shake' : ''}`} style={{ left: leftPos }}>
+                        <div key={opt.id} className={`absolute -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/95 rounded-3xl shadow-2xl flex items-center justify-center transition-all pointer-events-auto ${gameState === 'feedback_wrong' && opt.id === wrongSelectionId ? 'animate-shake' : ''}`} style={{ left: leftPos, top: '0%' }}>
                             <span className="text-4xl font-black">{opt.word}</span>
                         </div>
                     );
