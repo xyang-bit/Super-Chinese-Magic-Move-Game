@@ -57,50 +57,13 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
   const [gameState, setGameState] = useState<'playing' | 'feedback_correct' | 'feedback_wrong'>('playing');
   const [options, setOptions] = useState<WordItem[]>([]);
   const [feedbackMessage, setFeedbackMessage] = useState('');
-  const [winner, setWinner] = useState<number | null>(null);
   const [wrongSelectionId, setWrongSelectionId] = useState<string | null>(null);
   const [explosions, setExplosions] = useState<Explosion[]>([]);
-
-  // --- NEW: DYNAMIC CAMERA LOGIC ---
-  const [cameraSmooth, setCameraSmooth] = useState({ x: 0.5, y: 0.5, zoom: 1 });
 
   const sortedLandmarks = useMemo(() => {
     if (landmarks.length === 0) return [];
     return [...landmarks].sort((a, b) => (1 - (a[0]?.x || 0.5)) - (1 - (b[0]?.x || 0.5)));
   }, [landmarks]);
-
-  useEffect(() => {
-    if (sortedLandmarks.length > 0) {
-      // Calculate center of all players
-      const allX = sortedLandmarks.map(p => 1 - p[0].x);
-      const allY = sortedLandmarks.map(p => p[0].y);
-      const targetX = allX.reduce((a, b) => a + b, 0) / allX.length;
-      const targetY = allY.reduce((a, b) => a + b, 0) / allY.length;
-
-      // Calculate Zoom based on player spread
-      let targetZoom = 1.3; // Default zoom in
-      if (numPlayers > 1 && sortedLandmarks.length > 1) {
-        const dist = Math.abs((1 - sortedLandmarks[0][0].x) - (1 - sortedLandmarks[1][0].x));
-        // 1. More conservative zoom range
-        targetZoom = Math.max(1, 1.25 - (dist * 0.5)); // Capped at 1.25x instead of 1.5x
-      }
-
-      // Simple Lerp for smoothing
-      setCameraSmooth(prev => ({
-        x: prev.x + (targetX - prev.x) * 0.1,
-        y: prev.y + (targetY - prev.y) * 0.1,
-        zoom: prev.zoom + (targetZoom - prev.zoom) * 0.1
-      }));
-    }
-  }, [sortedLandmarks, numPlayers]);
-
-  // 1. Calculate the smoothed transform
-  const cameraTransform = useMemo(() => ({
-    transform: `scale(${cameraSmooth.zoom}) translate(${(0.5 - cameraSmooth.x) * 20}%, ${(0.5 - cameraSmooth.y) * 15}%)`,
-    transition: 'transform 0.15s ease-out'
-  }), [cameraSmooth]);
-
-  // --- END CAMERA LOGIC ---
 
   const currentTarget = useMemo(() => unit.words[currentWordIndex], [unit, currentWordIndex]);
 
@@ -127,7 +90,7 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
     setupCamera();
   }, []);
 
-  // 2. Collision Loop that accounts for the "Follow-Me" offset
+  // Static Collision Loop
   useEffect(() => {
     if (gameState !== 'playing' || sortedLandmarks.length === 0) return;
 
@@ -135,20 +98,14 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
       const nose = playerLandmarks[0];
       if (nose && nose.visibility > 0.5) {
         
-        // RAW COORDINATES (0 to 1)
-        const rawX = 1 - nose.x; 
-        const rawY = nose.y - 0.10; 
-
-        /* ADJUSTMENT: We calculate where the head is visually on the screen 
-           based on the current camera zoom and pan.
-        */
-        const visualX = 0.5 + (rawX - cameraSmooth.x) * cameraSmooth.zoom;
-        const visualY = 0.5 + (rawY - cameraSmooth.y) * cameraSmooth.zoom;
+        // RAW COORDINATES (0 to 1) - Reverting to basic head estimation
+        const headX = 1 - nose.x; 
+        const headY = nose.y - 0.10; 
 
         options.forEach((opt, boxIdx) => {
           // Define static Box Centers (Screen Space)
           let boxCX = 0.5;
-          const boxCY = 0.25; // Keep boxes in the top 25% of the screen
+          const boxCY = 0.25; // Matching the requested Top Layer placement
 
           if (numPlayers === 1) {
             boxCX = [0.2, 0.5, 0.8][boxIdx];
@@ -157,12 +114,11 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
             boxCX = offset + ((boxIdx * 2 + 1) / 6 * 0.5);
           }
 
-          const dx = visualX - boxCX;
-          const dy = visualY - boxCY;
+          const dx = headX - boxCX;
+          const dy = headY - boxCY;
           const distance = Math.sqrt(dx * dx + dy * dy);
 
-          // Slightly larger threshold for better "feel" when zoomed
-          const threshold = COLLISION_THRESHOLD * cameraSmooth.zoom;
+          const threshold = numPlayers === 1 ? COLLISION_THRESHOLD : COLLISION_THRESHOLD * 0.8;
 
           if (distance < threshold) {
             handleSelection(opt, playerIdx, boxCX, boxCY);
@@ -170,13 +126,12 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
         });
       }
     });
-  }, [sortedLandmarks, gameState, options, numPlayers, cameraSmooth]);
+  }, [sortedLandmarks, gameState, options, numPlayers]);
 
   const handleSelection = (selected: WordItem, playerIdx: number, x: number, y: number) => {
     if (gameState !== 'playing') return;
     if (selected.id === currentTarget.id) {
       setGameState('feedback_correct');
-      setWinner(playerIdx);
       const newScores = [...scores];
       newScores[playerIdx] += 1;
       setScores(newScores);
@@ -194,7 +149,6 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
           setFeedbackMessage('单元完成!');
           setTimeout(onExit, 4000);
         }
-        setWinner(null);
         setWrongSelectionId(null);
       }, 2500);
     } else {
@@ -220,18 +174,17 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
             </div>
         )}
 
-        {/* --- LAYER 1: THE CAMERA --- */}
+        {/* --- LAYER 1: STATIC CAMERA --- */}
         <div className="absolute inset-0 z-0 overflow-hidden bg-black">
             <video 
               ref={videoRef} 
-              style={cameraTransform}
-              className="w-full h-full object-cover transform -scale-x-100" 
+              className="absolute inset-0 w-full h-full object-cover transform -scale-x-100" 
               playsInline 
               muted 
             />
         </div>
 
-        {/* --- LAYER 2: GAME WORLD (STATIC) --- */}
+        {/* --- LAYER 2: GAME WORLD (STATIC DECOR) --- */}
         <div className="absolute inset-0 z-10 pointer-events-none">
             <div className="absolute top-20 left-[10%] opacity-40 text-8xl">☁️</div>
             <div className="absolute top-40 right-[15%] opacity-30 text-7xl">☁️</div>
@@ -240,7 +193,7 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
             </div>
         </div>
 
-        {/* --- LAYER 3: INTERACTIVE UI (STAYS IN FRONT) --- */}
+        {/* --- LAYER 3: INTERACTIVE UI --- */}
         <div className="absolute inset-0 z-50 pointer-events-none">
             {/* Top Bar */}
             <div className="p-4 flex justify-between items-start">
@@ -260,10 +213,14 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
                 {options.map((opt, boxIdx) => {
                     let leftPos = "50%";
                     if (numPlayers === 1) leftPos = boxIdx === 0 ? "20%" : boxIdx === 1 ? "50%" : "80%";
-                    else leftPos = `${(boxIdx < 3 ? (boxIdx * 2 + 1) / 6 * 50 : 50)}%`; // Simplified for example
+                    else leftPos = `${(boxIdx < 3 ? (boxIdx * 2 + 1) / 6 * 50 : 50)}%`; 
 
                     return (
-                        <div key={opt.id} className={`absolute -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/95 rounded-3xl shadow-2xl flex items-center justify-center transition-all pointer-events-auto ${gameState === 'feedback_wrong' && opt.id === wrongSelectionId ? 'animate-shake' : ''}`} style={{ left: leftPos, top: '50%' }}>
+                        <div 
+                          key={opt.id} 
+                          className={`absolute -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/95 rounded-3xl shadow-2xl flex items-center justify-center transition-all pointer-events-auto ${gameState === 'feedback_wrong' && opt.id === wrongSelectionId ? 'animate-shake' : ''}`} 
+                          style={{ left: leftPos, top: '50%' }}
+                        >
                             <span className="text-4xl font-black">{opt.word}</span>
                         </div>
                     );
