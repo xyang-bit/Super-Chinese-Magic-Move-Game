@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { usePoseLandmarker } from '../hooks/usePoseLandmarker';
-import { playSoundEffect } from '../services/soundService';
+import { soundService } from '../services/soundService';
 
 interface MotionStartProps {
     onStart: () => void;
@@ -76,7 +76,7 @@ const MotionStart: React.FC<MotionStartProps> = ({ onStart, numPlayers }) => {
 
         if (hit) {
             if (triggerCount > 20) { // ~0.5 seconds hold
-                playSoundEffect('correct');
+                soundService.playHit();
                 onStart();
             } else {
                 setTriggerCount(prev => prev + 1);

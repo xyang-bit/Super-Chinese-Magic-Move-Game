@@ -1,17 +1,63 @@
-// Simple audio context singleton
-let audioCtx: AudioContext | null = null;
+class SoundService {
+  private audioCtx: AudioContext | null = null;
+  private sounds: { [key: string]: HTMLAudioElement } = {};
+  private useSynth: { [key: string]: boolean } = { hit: false, miss: false };
 
-const getAudioContext = () => {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  constructor() {
+    this.loadAudio('hit', '/sounds/hit.mp3');
+    this.loadAudio('miss', '/sounds/miss.mp3');
+  }
+
+  private loadAudio(name: string, path: string) {
+    const audio = new Audio(path);
+    audio.oncanplaythrough = () => { this.sounds[name] = audio; };
+    audio.onerror = () => { this.useSynth[name] = true; };
+  }
+
+  private initContext() {
+    if (!this.audioCtx) {
+      this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
-    return audioCtx;
-};
+  }
+
+  private playSynth(freq: number, type: OscillatorType, duration: number) {
+    this.initContext();
+    if (!this.audioCtx) return;
+    const osc = this.audioCtx.createOscillator();
+    const gain = this.audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, this.audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, this.audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(this.audioCtx.destination);
+    osc.start();
+    osc.stop(this.audioCtx.currentTime + duration);
+  }
+
+  public playHit() {
+    if (this.sounds['hit'] && !this.useSynth['hit']) {
+      this.sounds['hit'].currentTime = 0;
+      this.sounds['hit'].play().catch(() => this.playSynth(880, 'sine', 0.1));
+    } else {
+      this.playSynth(880, 'sine', 0.1);
+    }
+  }
+
+  public playMiss() {
+    if (this.sounds['miss'] && !this.useSynth['miss']) {
+      this.sounds['miss'].currentTime = 0;
+      this.sounds['miss'].play().catch(() => this.playSynth(110, 'triangle', 0.3));
+    } else {
+      this.playSynth(110, 'triangle', 0.3);
+    }
+  }
+}
+
+export const soundService = new SoundService();
 
 export const speak = (text: string, lang: 'zh-CN' | 'en-US' = 'zh-CN', rate: number = 0.9, customAudioUrl?: string) => {
-    // 1. If custom audio is provided, play it.
     if (customAudioUrl) {
-        window.speechSynthesis.cancel(); // Stop any TTS
+        window.speechSynthesis.cancel();
         try {
             const audio = new Audio(customAudioUrl);
             audio.play().catch(err => console.error("Failed to play custom audio:", err));
@@ -21,24 +67,17 @@ export const speak = (text: string, lang: 'zh-CN' | 'en-US' = 'zh-CN', rate: num
         }
     }
 
-    // 2. Fallback to Browser TTS
     if (!('speechSynthesis' in window)) return;
-
-    // Cancel any ongoing speech
     window.speechSynthesis.cancel();
-
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = lang;
     utterance.rate = rate;
     utterance.pitch = 1.0;
     utterance.volume = 1;
 
-    // Try to find a good voice for the requested language
     const voices = window.speechSynthesis.getVoices();
     const preferredVoice = voices.find(
-        (voice) =>
-            voice.lang === lang ||
-            voice.lang.replace('_', '-').startsWith(lang.split('-')[0])
+        (voice) => voice.lang === lang || voice.lang.replace('_', '-').startsWith(lang.split('-')[0])
     );
 
     if (preferredVoice) {
@@ -48,54 +87,3 @@ export const speak = (text: string, lang: 'zh-CN' | 'en-US' = 'zh-CN', rate: num
     window.speechSynthesis.speak(utterance);
 };
 
-export const playSoundEffect = (type: 'correct' | 'wrong' | 'pop') => {
-    const ctx = getAudioContext();
-    if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => { });
-    }
-
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    const now = ctx.currentTime;
-
-    if (type === 'correct') {
-        // Cheerful major arpeggio (C5 -> E5 -> G5)
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(523.25, now); // C5
-        osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
-        osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
-
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.3, now + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
-
-        osc.start(now);
-        osc.stop(now + 0.6);
-    } else if (type === 'wrong') {
-        // Low Sawtooth "Buzz"
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(150, now);
-        osc.frequency.linearRampToValueAtTime(100, now + 0.3);
-
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-
-        osc.start(now);
-        osc.stop(now + 0.4);
-    } else {
-        // Pop sound
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(400, now);
-        osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
-
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-
-        osc.start(now);
-        osc.stop(now + 0.1);
-    }
-};

@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { GameUnit, WordItem } from '../types';
 import { usePoseLandmarker } from '../hooks/usePoseLandmarker';
 import { COLLISION_THRESHOLD } from '../constants';
-import { speak, playSoundEffect } from '../services/soundService';
+import { speak, soundService } from '../services/soundService';
+import { launchFirework } from '../utils/effects';
 
 interface GameLevelProps {
     unit: GameUnit;
@@ -196,7 +197,8 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
                 setExplosions((prev) => prev.filter((e) => e.id !== newExplosion.id));
             }, 1000);
 
-            playSoundEffect('correct');
+            soundService.playHit();
+            launchFirework();
 
             // Feedback: Speak "Found [Word]"
             // Use custom audio if available
@@ -210,7 +212,7 @@ const GameLevel: React.FC<GameLevelProps> = ({ unit, onExit, numPlayers, gameMod
             setGameState('feedback_wrong');
             setWrongSelectionId(selected.id);
             setFeedbackMessage('再试一次!');
-            playSoundEffect('wrong');
+            soundService.playMiss();
             speak("再试一次!", 'zh-CN');
 
             setTimeout(() => {
